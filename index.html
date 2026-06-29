@@ -397,33 +397,46 @@ function importPaste(){
   const raw=document.getElementById('f-paste').value;
   if(!raw.trim()){ alert('名刺の文字を貼り付けてください。'); return; }
   const lines=raw.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-  const used=new Array(lines.length).fill(false);
   const setIf=(id,val)=>{ const el=document.getElementById('f-'+id); if(el && !el.value && val) el.value=val; };
-  const tels=[], mails=[];
-  // メール
-  lines.forEach((ln,i)=>{ const m=ln.match(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/); if(m){ mails.push(m[0]); used[i]=true; } });
-  // 郵便番号
-  lines.forEach((ln,i)=>{ const m=ln.match(/〒?\s*(\d{3})[-－\s]?(\d{4})/); if(m){ setIf('zip', m[1]+'-'+m[2]); if(/^〒?\s*\d{3}[-－\s]?\d{4}$/.test(ln)) used[i]=true; } });
-  // 電話・FAX
-  lines.forEach((ln,i)=>{ const m=ln.match(/0\d{1,4}[-(\s]?\d{1,4}[-)\s]?\d{3,4}/); if(m){ if(/fax|ＦＡＸ|ﾌｧｸｽ|ファクス/i.test(ln)) setIf('fax',m[0]); else tels.push(m[0]); used[i]=true; } });
-  // 会社名
-  lines.forEach((ln,i)=>{ if(!used[i] && /株式会社|有限会社|合同会社|（株）|\(株\)|（有）|\(有\)|Inc|Co[\.,]|Ltd|Corp|Company/i.test(ln)){ setIf('comp',ln); used[i]=true; } });
-  // 役職
-  lines.forEach((ln,i)=>{ if(!used[i] && /代表|取締役|会長|社長|専務|常務|本部長|部長|次長|課長|係長|主任|主査|店長|所長|マネージャー|ディレクター|リーダー|CEO|COO|CTO|CFO|President|Manager|Director/i.test(ln)){ setIf('title',ln); used[i]=true; } });
-  // 住所
-  lines.forEach((ln,i)=>{ if(!used[i] && (PREF.test(ln) || /[市区町村郡].*[0-9０-９]/.test(ln) || /[0-9０-９]+(丁目|番地|番|号)/.test(ln))){ const cur=document.getElementById('f-addr'); cur.value=(cur.value?cur.value+' ':'')+ln; used[i]=true; } });
-  // フリガナ（カタカナ・ひらがなだけの行）
-  lines.forEach((ln,i)=>{ if(!used[i] && /^[぀-ヿ\sー・]+$/.test(ln) && ln.length>=2){ setIf('furi',ln); used[i]=true; } });
-  // 氏名（数字なし・短め・記号少なめの最初の未使用行）
-  for(let i=0;i<lines.length;i++){ if(!used[i]){ const ln=lines[i]; if(!/\d|@|[:：/／]/.test(ln) && ln.length<=12){ setIf('name',ln); used[i]=true; break; } } }
-  // 電話・メールを割り当て
+  const has=(id)=>!!document.getElementById('f-'+id).value;
+  const addAddr=(v)=>{ const cur=document.getElementById('f-addr'); cur.value=(cur.value?cur.value+' ':'')+v; };
+  const tels=[], mails=[], quals=[], rest=[];
+  const emailRe=/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g;
+  const telRe=/0\d{1,4}[-(\s]?\d{1,4}[-)\s]?\d{3,4}/g;
+  lines.forEach(orig=>{
+    let ln=orig;
+    // メール（1行に複数・他情報と同居でも抽出）
+    const em=ln.match(emailRe); if(em){ em.forEach(e=>mails.push(e)); ln=ln.replace(emailRe,' '); }
+    // 郵便番号
+    const z=ln.match(/〒?\s*(\d{3})[-－\s]?(\d{4})/); if(z){ setIf('zip', z[1]+'-'+z[2]); ln=ln.replace(/〒?\s*\d{3}[-－\s]?\d{4}/,' '); }
+    // 電話・FAX
+    const isFax=/fax|ＦＡＸ|ﾌｧｸｽ|ファクス/i.test(orig);
+    const ph=ln.match(telRe); if(ph){ ph.forEach(p=>{ if(isFax) setIf('fax',p); else tels.push(p); }); ln=ln.replace(telRe,' '); }
+    // ラベル語を除去
+    ln=ln.replace(/(携帯|電話|代表|フリーダイヤル|TEL|Tel|FAX|Fax|E-?mail|Mail|〒)[:：]?/gi,' ').replace(/\s+/g,' ').trim();
+    if(!ln) return;
+    // 住所
+    if(PREF.test(ln) || /[0-9０-９]+(丁目|番地|番|号)/.test(ln) || /[市区町村郡].*[0-9０-９]/.test(ln)){ addAddr(ln); return; }
+    // 会社名
+    if(!has('comp') && /株式会社|有限会社|合同会社|（株）|\(株\)|（有）|\(有\)|Inc|Co[\.,]|Ltd|Corp|Company/i.test(ln)){ setIf('comp',ln); return; }
+    // 役職
+    if(!has('title') && /代表|取締役|会長|社長|専務|常務|本部長|部長|次長|課長|係長|主任|主査|店長|所長|マネージャー|ディレクター|リーダー|CEO|COO|CTO|CFO|President|Manager|Director/i.test(ln)){ setIf('title',ln); return; }
+    // 資格・所属
+    if(/技能士|アドバイザー|資格|協会|支部長|認定|級|診断士|プランナー/.test(ln)){ quals.push(ln); return; }
+    // フリガナ（カタカナ・ひらがなだけ）
+    if(/^[぀-ヿ\sー・]+$/.test(ln) && ln.length>=2){ setIf('furi',ln); return; }
+    // 氏名（漢字＋空白＋漢字）
+    if(!has('name') && /^[一-龥々]{1,5}[\s　]+[一-龥々]{1,5}$/.test(ln)){ setIf('name',ln); return; }
+    rest.push(ln);
+  });
+  // 氏名がまだ空なら残りから推定（数字・記号なし・短め）
+  if(!has('name')){ const i=rest.findIndex(s=>!/\d|@|[:：/／・]/.test(s) && s.length>=2 && s.length<=12); if(i>=0){ setIf('name', rest[i]); rest.splice(i,1); } }
   if(tels[0]) setIf('tel',tels[0]);
   if(tels[1]) setIf('tel2',tels[1]);
   if(mails[0]) setIf('mail',mails[0]);
   if(mails[1]) setIf('mail2',mails[1]);
-  // 未割当はメモに退避（取りこぼし防止）
-  const left=lines.filter((_,i)=>!used[i]);
-  if(left.length){ const memo=document.getElementById('f-memo'); memo.value=(memo.value?memo.value+'\n':'')+'【未割当】'+left.join(' / '); }
+  if(quals.length) setIf('qual', quals.join('、'));
+  if(rest.length){ const memo=document.getElementById('f-memo'); memo.value=(memo.value?memo.value+'\n':'')+'【未割当】'+rest.join(' / '); }
   document.getElementById('f-paste').value='';
   toast('取り込みました。氏名・会社などを確認してください');
 }
