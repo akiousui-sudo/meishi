@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>名刺管理</title>
+<style>
+  :root{
+    --bg:#f4f6f9; --card:#fff; --line:#dfe4ea; --ink:#2f3640;
+    --sub:#717d8a; --pri:#2d6cdf; --pri-d:#1f56b8; --danger:#e84118; --ok:#27ae60;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+       background:var(--bg);color:var(--ink);font-size:15px;line-height:1.6;}
+  header{position:sticky;top:0;z-index:10;background:var(--pri);color:#fff;padding:12px 16px;
+         display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 6px rgba(0,0,0,.12);}
+  header h1{font-size:18px;margin:0;}
+  header .count{font-size:13px;opacity:.9;}
+  nav{display:flex;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:48px;z-index:9;}
+  nav button{flex:1;border:0;background:none;padding:12px;font-size:15px;color:var(--sub);cursor:pointer;border-bottom:3px solid transparent;}
+  nav button.active{color:var(--pri);border-bottom-color:var(--pri);font-weight:bold;}
+  main{padding:14px;max-width:760px;margin:0 auto;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;}
+  label{display:block;font-size:13px;color:var(--sub);margin:10px 0 3px;}
+  input,textarea,select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-size:15px;background:#fff;font-family:inherit;}
+  textarea{resize:vertical;min-height:54px;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;}
+  .row > div{flex:1;min-width:130px;}
+  .btn{display:inline-block;border:0;border-radius:8px;padding:11px 16px;font-size:15px;cursor:pointer;font-family:inherit;}
+  .btn-pri{background:var(--pri);color:#fff;}
+  .btn-pri:active{background:var(--pri-d);}
+  .btn-sub{background:#eef1f6;color:var(--ink);}
+  .btn-danger{background:var(--danger);color:#fff;}
+  .btn-ok{background:var(--ok);color:#fff;}
+  .btn-block{width:100%;margin-top:14px;}
+  .sec-title{font-weight:bold;font-size:13px;color:var(--pri);margin:6px 0 0;letter-spacing:.04em;}
+  hr{border:0;border-top:1px solid var(--line);margin:14px 0;}
+  .list-item{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;cursor:pointer;}
+  .list-item:active{background:#f0f4ff;}
+  .li-name{font-size:17px;font-weight:bold;}
+  .li-furi{font-size:12px;color:var(--sub);font-weight:normal;margin-left:6px;}
+  .li-comp{color:var(--ink);}
+  .li-meta{font-size:12px;color:var(--sub);margin-top:4px;}
+  .badge{display:inline-block;background:#eef1f6;color:var(--sub);border-radius:20px;padding:2px 9px;font-size:11px;margin:2px 4px 0 0;}
+  .badge.qual{background:#e7f5ec;color:#1e7a44;}
+  .badge.ref{background:#fdeee6;color:#b8531a;}
+  .empty{text-align:center;color:var(--sub);padding:40px 10px;}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-start;justify-content:center;z-index:50;overflow:auto;padding:20px 10px;}
+  .modal-bg.show{display:flex;}
+  .modal{background:#fff;border-radius:14px;max-width:640px;width:100%;padding:16px;}
+  .modal h2{margin:0 0 4px;font-size:18px;}
+  .detail-row{display:flex;padding:7px 0;border-bottom:1px solid #f0f2f5;}
+  .detail-row .k{width:90px;color:var(--sub);font-size:13px;flex-shrink:0;}
+  .detail-row .v{flex:1;word-break:break-word;}
+  .thumb{max-width:100%;border-radius:8px;border:1px solid var(--line);margin-top:6px;}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+  .toolbar .btn{flex:1;}
+  .hint{font-size:12px;color:var(--sub);margin-top:4px;}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#2f3640;color:#fff;padding:10px 18px;border-radius:24px;font-size:14px;opacity:0;transition:.3s;z-index:100;pointer-events:none;}
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+<header>
+  <h1>名刺管理</h1>
+  <span><span class="count" id="count">0 件</span>　<span style="cursor:pointer" onclick="openSettings()">⚙️</span></span>
+</header>
+<nav>
+  <button id="tab-list" class="active" onclick="showTab('list')">一覧・検索</button>
+  <button id="tab-new" onclick="newCard()">＋ 新規登録</button>
+</nav>
+
+<main>
+  <!-- 一覧・検索 -->
+  <section id="view-list">
+    <div class="card">
+      <div class="row">
+        <div><label>氏名</label><input id="s-name" oninput="render()"></div>
+        <div><label>会社名</label><input id="s-comp" oninput="render()"></div>
+      </div>
+      <div class="row">
+        <div><label>郵便番号・住所</label><input id="s-addr" oninput="render()"></div>
+        <div><label>電話番号</label><input id="s-tel" oninput="render()"></div>
+      </div>
+      <div class="row">
+        <div><label>資格</label><input id="s-qual" oninput="render()"></div>
+        <div><label>紹介者</label><input id="s-ref" oninput="render()"></div>
+      </div>
+      <div class="row">
+        <div><label>登録日（から）</label><input type="date" id="s-from" onchange="render()"></div>
+        <div><label>登録日（まで）</label><input type="date" id="s-to" onchange="render()"></div>
+      </div>
+      <label>フリーワード（すべての項目を横断検索）</label>
+      <input id="s-free" oninput="render()" placeholder="名前・会社・メモ など何でも">
+      <button class="btn btn-sub btn-block" onclick="clearSearch()">検索条件をクリア</button>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn btn-ok" onclick="newCard()">＋ 新規登録</button>
+      <button class="btn btn-sub" onclick="exportCSV()">CSVバックアップ</button>
+      <button class="btn btn-sub" onclick="document.getElementById('importer').click()">CSV取込</button>
+      <input type="file" id="importer" accept=".csv" style="display:none" onchange="importCSV(this)">
+    </div>
+
+    <div id="results"></div>
+  </section>
+</main>
+
+<!-- 登録・編集モーダル -->
+<div class="modal-bg" id="editBg">
+  <div class="modal">
+    <h2 id="editTitle">新規登録</h2>
+    <input type="hidden" id="f-id">
+
+    <div style="background:#eef5ff;border:1px solid #bcd7ff;border-radius:10px;padding:10px;margin-bottom:8px">
+      <label style="margin-top:0">📋 貼り付け取り込み（無料）</label>
+      <div class="hint">iPhoneでコピーした名刺の文字を貼り付け→「取り込む」で自動振り分け</div>
+      <textarea id="f-paste" placeholder="ここに名刺の文字を貼り付け"></textarea>
+      <button class="btn btn-ok btn-block" style="margin-top:8px" onclick="importPaste()">取り込む</button>
+    </div>
+
+    <p class="sec-title">基本情報</p>
+    <div class="row">
+      <div><label>氏名 *</label><input id="f-name"></div>
+      <div><label>フリガナ</label><input id="f-furi"></div>
+    </div>
+    <label>会社名</label><input id="f-comp">
+    <div class="row">
+      <div><label>部署</label><input id="f-dept"></div>
+      <div><label>役職</label><input id="f-title"></div>
+    </div>
+
+    <p class="sec-title">連絡先</p>
+    <label>郵便番号</label><input id="f-zip">
+    <label>住所</label><input id="f-addr">
+    <div class="row">
+      <div><label>電話1</label><input id="f-tel"></div>
+      <div><label>電話2</label><input id="f-tel2"></div>
+    </div>
+    <div class="row">
+      <div><label>メール1</label><input id="f-mail"></div>
+      <div><label>メール2</label><input id="f-mail2"></div>
+    </div>
+    <label>FAX</label><input id="f-fax">
+
+    <p class="sec-title">分類・検索用</p>
+    <label>資格（複数は「、」区切り）</label><input id="f-qual" placeholder="例：宅地建物取引士、FP2級">
+    <label>業種・カテゴリ（タグ）</label><input id="f-cat" placeholder="例：保険、不動産">
+    <label>メモ</label><textarea id="f-memo"></textarea>
+
+    <p class="sec-title">管理情報</p>
+    <label>紹介者（誰からの紹介か）</label>
+    <input id="f-ref" placeholder="例：BNI ○○チャプター・田中さんの紹介">
+    <div class="row">
+      <div><label>登録日</label><input type="date" id="f-date"></div>
+      <div><label>交換した場所・きっかけ</label><input id="f-where" placeholder="例：BNI定例会"></div>
+    </div>
+    <label>名刺画像</label>
+    <input type="file" id="f-img" accept="image/*" capture="environment" onchange="loadImg(this)">
+    <button class="btn btn-ok btn-block" id="ocrBtn" onclick="ocr()">🤖 この画像から自動入力（AI読み取り）</button>
+    <div id="imgPrev"></div>
+
+    <button class="btn btn-pri btn-block" onclick="save()">保存する</button>
+    <div class="row" style="margin-top:8px">
+      <div><button class="btn btn-sub btn-block" style="margin-top:0" onclick="closeEdit()">キャンセル</button></div>
+      <div><button class="btn btn-danger btn-block" id="delBtn" style="margin-top:0;display:none" onclick="del()">削除</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- 詳細モーダル -->
+<div class="modal-bg" id="detailBg">
+  <div class="modal" id="detailBody"></div>
+</div>
+
+<!-- 設定モーダル -->
+<div class="modal-bg" id="settingsBg">
+  <div class="modal">
+    <h2>設定（AI読み取り）</h2>
+    <p class="hint">名刺写真からの自動入力にはClaude APIキーが必要です。キーはこの端末内にのみ保存されます。</p>
+    <label>Claude APIキー（sk-ant-…）</label>
+    <input id="set-key" type="password" placeholder="sk-ant-...">
+    <label>使用モデル</label>
+    <select id="set-model">
+      <option value="claude-sonnet-4-6">Sonnet 4.6（精度重視・1枚 約1〜2円）</option>
+      <option value="claude-haiku-4-5">Haiku 4.5（低コスト・1枚 約0.3円）</option>
+    </select>
+    <p class="hint">APIキーは <b>console.anthropic.com</b> で発行できます（従量課金）。</p>
+    <button class="btn btn-pri btn-block" onclick="saveSettings()">保存</button>
+    <button class="btn btn-sub btn-block" style="margin-top:8px" onclick="document.getElementById('settingsBg').classList.remove('show')">閉じる</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const DB_KEY = 'meishi_db_v1';
+let DATA = [];
+let curImg = '';
+
+/* ===== 保存・読込（端末内 localStorage） ===== */
+function loadDB(){ try{ DATA = JSON.parse(localStorage.getItem(DB_KEY)) || []; }catch(e){ DATA=[]; } }
+function saveDB(){ localStorage.setItem(DB_KEY, JSON.stringify(DATA)); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function today(){ return new Date().toISOString().slice(0,10); }
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1800); }
+function esc(s){ return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ===== タブ ===== */
+function showTab(t){
+  document.getElementById('tab-list').classList.toggle('active', t==='list');
+  document.getElementById('tab-new').classList.toggle('active', t==='new');
+}
+
+/* ===== 一覧・検索 ===== */
+function val(id){ return document.getElementById(id).value.trim().toLowerCase(); }
+function clearSearch(){ ['s-name','s-comp','s-addr','s-tel','s-qual','s-ref','s-from','s-to','s-free'].forEach(i=>document.getElementById(i).value=''); render(); }
+
+function matches(r){
+  const has=(field,q)=> !q || (field||'').toLowerCase().includes(q);
+  const n=val('s-name'),c=val('s-comp'),a=val('s-addr'),t=val('s-tel'),q=val('s-qual'),rf=val('s-ref'),f=val('s-free');
+  const from=document.getElementById('s-from').value, to=document.getElementById('s-to').value;
+  if(!has(r.name,n)&&!has(r.furi,n)) return false;
+  if(!has(r.comp,c)) return false;
+  if(!(has(r.addr,a)||has(r.zip,a))) return false;
+  if(!has(r.tel,t)&&!has(r.tel2,t)&&!has(r.fax,t)) return false;
+  if(!has(r.qual,q)) return false;
+  if(!has(r.ref,rf)) return false;
+  if(from && (r.date||'')<from) return false;
+  if(to && (r.date||'')>to) return false;
+  if(f){ const blob=[r.name,r.furi,r.comp,r.dept,r.title,r.zip,r.addr,r.tel,r.tel2,r.mail,r.mail2,r.fax,r.qual,r.cat,r.memo,r.ref,r.where].join(' ').toLowerCase(); if(!blob.includes(f)) return false; }
+  return true;
+}
+
+function render(){
+  document.getElementById('count').textContent = DATA.length + ' 件';
+  const list = DATA.filter(matches).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.createdAt||0)-(a.createdAt||0));
+  const box = document.getElementById('results');
+  if(!DATA.length){ box.innerHTML='<div class="empty">まだ登録がありません。<br>「＋ 新規登録」から始めましょう。</div>'; return; }
+  if(!list.length){ box.innerHTML='<div class="empty">条件に一致する名刺がありません。</div>'; return; }
+  box.innerHTML = list.map(r=>`
+    <div class="list-item" onclick="detail('${r.id}')">
+      <div class="li-name">${esc(r.name)||'(無名)'}<span class="li-furi">${esc(r.furi)}</span></div>
+      <div class="li-comp">${esc(r.comp)}${r.title?' / '+esc(r.title):''}</div>
+      <div class="li-meta">${r.date?'登録 '+r.date:''}${r.tel?'　☎ '+esc(r.tel):''}</div>
+      <div>${(r.qual||'').split(/[、,]/).filter(Boolean).map(q=>`<span class="badge qual">${esc(q.trim())}</span>`).join('')}
+           ${r.ref?`<span class="badge ref">紹介:${esc(r.ref)}</span>`:''}</div>
+    </div>`).join('');
+}
+
+/* ===== 詳細表示 ===== */
+function detail(id){
+  const r = DATA.find(x=>x.id===id); if(!r) return;
+  const row=(k,v)=> v?`<div class="detail-row"><div class="k">${k}</div><div class="v">${esc(v)}</div></div>`:'';
+  document.getElementById('detailBody').innerHTML = `
+    <h2>${esc(r.name)||'(無名)'} <span class="li-furi">${esc(r.furi)}</span></h2>
+    ${row('会社',r.comp)}${row('部署',r.dept)}${row('役職',r.title)}
+    ${row('〒',r.zip)}${row('住所',r.addr)}${row('電話1',r.tel)}${row('電話2',r.tel2)}${row('メール1',r.mail)}${row('メール2',r.mail2)}${row('FAX',r.fax)}
+    ${row('資格',r.qual)}${row('カテゴリ',r.cat)}${row('メモ',r.memo)}
+    ${row('紹介者',r.ref)}${row('登録日',r.date)}${row('交換場所',r.where)}
+    ${r.img?`<img class="thumb" src="${r.img}">`:''}
+    <div class="row" style="margin-top:14px">
+      <div><button class="btn btn-pri btn-block" style="margin-top:0" onclick="edit('${r.id}')">編集</button></div>
+      <div><button class="btn btn-sub btn-block" style="margin-top:0" onclick="closeDetail()">閉じる</button></div>
+    </div>`;
+  document.getElementById('detailBg').classList.add('show');
+}
+function closeDetail(){ document.getElementById('detailBg').classList.remove('show'); }
+
+/* ===== 登録・編集 ===== */
+const FIELDS=['name','furi','comp','dept','title','zip','tel','tel2','addr','mail','mail2','fax','qual','cat','memo','ref','date','where'];
+function newCard(){
+  showTab('new');
+  document.getElementById('editTitle').textContent='新規登録';
+  document.getElementById('f-id').value='';
+  FIELDS.forEach(f=>document.getElementById('f-'+f).value='');
+  document.getElementById('f-paste').value='';
+  document.getElementById('f-date').value=today();
+  curImg=''; document.getElementById('imgPrev').innerHTML=''; document.getElementById('f-img').value='';
+  document.getElementById('delBtn').style.display='none';
+  document.getElementById('editBg').classList.add('show');
+}
+function edit(id){
+  const r=DATA.find(x=>x.id===id); if(!r) return;
+  closeDetail();
+  document.getElementById('editTitle').textContent='編集';
+  document.getElementById('f-id').value=r.id;
+  FIELDS.forEach(f=>document.getElementById('f-'+f).value=r[f]||'');
+  document.getElementById('f-paste').value='';
+  curImg=r.img||''; document.getElementById('imgPrev').innerHTML = curImg?`<img class="thumb" src="${curImg}">`:'';
+  document.getElementById('f-img').value='';
+  document.getElementById('delBtn').style.display='block';
+  document.getElementById('editBg').classList.add('show');
+}
+function closeEdit(){ document.getElementById('editBg').classList.remove('show'); showTab('list'); }
+
+function loadImg(input){
+  const file=input.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=e=>{
+    // 長辺1200pxに縮小して保存容量を抑える
+    const img=new Image();
+    img.onload=()=>{
+      const max=1200; let{width:w,height:h}=img;
+      if(w>max||h>max){ const s=max/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s); }
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      curImg=cv.toDataURL('image/jpeg',0.8);
+      document.getElementById('imgPrev').innerHTML=`<img class="thumb" src="${curImg}">`;
+    };
+    img.src=e.target.result;
+  };
+  r.readAsDataURL(file);
+}
+
+function save(){
+  const g=id=>document.getElementById('f-'+id).value.trim();
+  if(!g('name')){ alert('氏名を入力してください。'); return; }
+  const id=document.getElementById('f-id').value;
+
+  // 重複チェック（新規登録のときのみ）
+  if(!id){
+    const dup=DATA.filter(r=>
+      (r.name && r.name===g('name') && r.comp===g('comp')) ||
+      (g('tel') && r.tel===g('tel')) ||
+      (g('mail') && r.mail===g('mail'))
+    );
+    if(dup.length){
+      const ok=confirm(`似た登録が ${dup.length} 件あります：\n`+
+        dup.slice(0,5).map(d=>`・${d.name} / ${d.comp||'会社名なし'}`).join('\n')+
+        `\n\n同じ方の名刺かもしれません。\nそれでも「別の名刺」として登録しますか？\n（キャンセルすると登録を中止します）`);
+      if(!ok) return;
+    }
+  }
+
+  const rec = id ? DATA.find(x=>x.id===id) : {id:uid(),createdAt:Date.now()};
+  FIELDS.forEach(f=>rec[f]=g(f));
+  rec.img=curImg; rec.updatedAt=Date.now();
+  if(!id) DATA.push(rec);
+  saveDB(); render(); closeEdit();
+  toast(id?'更新しました':'登録しました');
+}
+
+function del(){
+  const id=document.getElementById('f-id').value;
+  if(!id) return;
+  if(!confirm('この名刺を削除します。よろしいですか？')) return;
+  DATA=DATA.filter(x=>x.id!==id);
+  saveDB(); render(); closeEdit();
+  toast('削除しました');
+}
+
+/* ===== CSV バックアップ／取込 ===== */
+const CSV_COLS=['name','furi','comp','dept','title','zip','tel','tel2','addr','mail','mail2','fax','qual','cat','memo','ref','date','where'];
+const CSV_HEAD=['氏名','フリガナ','会社名','部署','役職','郵便番号','電話1','電話2','住所','メール1','メール2','FAX','資格','カテゴリ','メモ','紹介者','登録日','交換場所'];
+function csvCell(s){ s=(s||'').replace(/"/g,'""'); return `"${s}"`; }
+function exportCSV(){
+  const rows=[CSV_HEAD.join(',')].concat(DATA.map(r=>CSV_COLS.map(c=>csvCell(r[c])).join(',')));
+  const blob=new Blob(['﻿'+rows.join('\r\n')],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='名刺バックアップ_'+today()+'.csv';
+  a.click();
+  toast('CSVを書き出しました');
+}
+function parseCSV(text){
+  const rows=[];let row=[],cell='',q=false;
+  text=text.replace(/^﻿/,'');
+  for(let i=0;i<text.length;i++){const ch=text[i];
+    if(q){ if(ch==='"'){ if(text[i+1]==='"'){cell+='"';i++;} else q=false; } else cell+=ch; }
+    else{ if(ch==='"')q=true; else if(ch===','){row.push(cell);cell='';} else if(ch==='\n'){row.push(cell);rows.push(row);row=[];cell='';} else if(ch!=='\r')cell+=ch; }
+  }
+  if(cell!==''||row.length){row.push(cell);rows.push(row);}
+  return rows;
+}
+function importCSV(input){
+  const file=input.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=e=>{
+    const rows=parseCSV(e.target.result).filter(r=>r.some(c=>c.trim()!==''));
+    if(rows.length<2){ alert('データがありません。'); return; }
+    if(!confirm(`${rows.length-1} 件を取り込みます。よろしいですか？`)){ input.value=''; return; }
+    for(let i=1;i<rows.length;i++){
+      const rec={id:uid(),createdAt:Date.now(),updatedAt:Date.now()};
+      CSV_COLS.forEach((c,j)=>rec[c]=(rows[i][j]||'').trim());
+      DATA.push(rec);
+    }
+    saveDB(); render(); input.value='';
+    toast('取り込みました');
+  };
+  r.readAsText(file);
+}
+
+/* ===== 貼り付け取り込み（無料・端末内処理） ===== */
+const PREF=/(北海道|青森県|岩手県|宮城県|秋田県|山形県|福島県|茨城県|栃木県|群馬県|埼玉県|千葉県|東京都|神奈川県|新潟県|富山県|石川県|福井県|山梨県|長野県|岐阜県|静岡県|愛知県|三重県|滋賀県|京都府|大阪府|兵庫県|奈良県|和歌山県|鳥取県|島根県|岡山県|広島県|山口県|徳島県|香川県|愛媛県|高知県|福岡県|佐賀県|長崎県|熊本県|大分県|宮崎県|鹿児島県|沖縄県)/;
+function importPaste(){
+  const raw=document.getElementById('f-paste').value;
+  if(!raw.trim()){ alert('名刺の文字を貼り付けてください。'); return; }
+  const lines=raw.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  const used=new Array(lines.length).fill(false);
+  const setIf=(id,val)=>{ const el=document.getElementById('f-'+id); if(el && !el.value && val) el.value=val; };
+  const tels=[], mails=[];
+  // メール
+  lines.forEach((ln,i)=>{ const m=ln.match(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/); if(m){ mails.push(m[0]); used[i]=true; } });
+  // 郵便番号
+  lines.forEach((ln,i)=>{ const m=ln.match(/〒?\s*(\d{3})[-－\s]?(\d{4})/); if(m){ setIf('zip', m[1]+'-'+m[2]); if(/^〒?\s*\d{3}[-－\s]?\d{4}$/.test(ln)) used[i]=true; } });
+  // 電話・FAX
+  lines.forEach((ln,i)=>{ const m=ln.match(/0\d{1,4}[-(\s]?\d{1,4}[-)\s]?\d{3,4}/); if(m){ if(/fax|ＦＡＸ|ﾌｧｸｽ|ファクス/i.test(ln)) setIf('fax',m[0]); else tels.push(m[0]); used[i]=true; } });
+  // 会社名
+  lines.forEach((ln,i)=>{ if(!used[i] && /株式会社|有限会社|合同会社|（株）|\(株\)|（有）|\(有\)|Inc|Co[\.,]|Ltd|Corp|Company/i.test(ln)){ setIf('comp',ln); used[i]=true; } });
+  // 役職
+  lines.forEach((ln,i)=>{ if(!used[i] && /代表|取締役|会長|社長|専務|常務|本部長|部長|次長|課長|係長|主任|主査|店長|所長|マネージャー|ディレクター|リーダー|CEO|COO|CTO|CFO|President|Manager|Director/i.test(ln)){ setIf('title',ln); used[i]=true; } });
+  // 住所
+  lines.forEach((ln,i)=>{ if(!used[i] && (PREF.test(ln) || /[市区町村郡].*[0-9０-９]/.test(ln) || /[0-9０-９]+(丁目|番地|番|号)/.test(ln))){ const cur=document.getElementById('f-addr'); cur.value=(cur.value?cur.value+' ':'')+ln; used[i]=true; } });
+  // フリガナ（カタカナ・ひらがなだけの行）
+  lines.forEach((ln,i)=>{ if(!used[i] && /^[぀-ヿ\sー・]+$/.test(ln) && ln.length>=2){ setIf('furi',ln); used[i]=true; } });
+  // 氏名（数字なし・短め・記号少なめの最初の未使用行）
+  for(let i=0;i<lines.length;i++){ if(!used[i]){ const ln=lines[i]; if(!/\d|@|[:：/／]/.test(ln) && ln.length<=12){ setIf('name',ln); used[i]=true; break; } } }
+  // 電話・メールを割り当て
+  if(tels[0]) setIf('tel',tels[0]);
+  if(tels[1]) setIf('tel2',tels[1]);
+  if(mails[0]) setIf('mail',mails[0]);
+  if(mails[1]) setIf('mail2',mails[1]);
+  // 未割当はメモに退避（取りこぼし防止）
+  const left=lines.filter((_,i)=>!used[i]);
+  if(left.length){ const memo=document.getElementById('f-memo'); memo.value=(memo.value?memo.value+'\n':'')+'【未割当】'+left.join(' / '); }
+  document.getElementById('f-paste').value='';
+  toast('取り込みました。氏名・会社などを確認してください');
+}
+
+/* ===== 設定（APIキー・モデル） ===== */
+const KEY_STORE='meishi_apikey', MODEL_STORE='meishi_model';
+function getKey(){ return localStorage.getItem(KEY_STORE)||''; }
+function getModel(){ return localStorage.getItem(MODEL_STORE)||'claude-sonnet-4-6'; }
+function openSettings(){
+  document.getElementById('set-key').value=getKey();
+  document.getElementById('set-model').value=getModel();
+  document.getElementById('settingsBg').classList.add('show');
+}
+function saveSettings(){
+  localStorage.setItem(KEY_STORE, document.getElementById('set-key').value.trim());
+  localStorage.setItem(MODEL_STORE, document.getElementById('set-model').value);
+  document.getElementById('settingsBg').classList.remove('show');
+  toast('設定を保存しました');
+}
+
+/* ===== AI読み取り（Claude API・ブラウザ直接呼び出し） ===== */
+const OCR_FIELDS={name:'氏名',furi:'フリガナ(全角カタカナ)',comp:'会社名',dept:'部署',title:'役職',zip:'郵便番号',addr:'住所',tel:'電話番号1',tel2:'電話番号2',mail:'メールアドレス1',mail2:'メールアドレス2',fax:'FAX番号',qual:'資格(複数は読点区切り)',cat:'業種カテゴリ'};
+async function ocr(){
+  const key=getKey();
+  if(!key){ alert('先に⚙️設定でAPIキーを入力してください。'); openSettings(); return; }
+  if(!curImg){ alert('先に名刺画像を選んでください。'); return; }
+  const btn=document.getElementById('ocrBtn');
+  btn.disabled=true; const old=btn.textContent; btn.textContent='読み取り中…';
+  try{
+    const media=curImg.substring(5, curImg.indexOf(';'));
+    const data=curImg.substring(curImg.indexOf(',')+1);
+    const props={}, req=[];
+    Object.keys(OCR_FIELDS).forEach(k=>{ props[k]={type:'string',description:OCR_FIELDS[k]}; req.push(k); });
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'content-type':'application/json',
+        'x-api-key':key,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({
+        model:getModel(),
+        max_tokens:1024,
+        output_config:{format:{type:'json_schema',schema:{type:'object',properties:props,required:req,additionalProperties:false}}},
+        messages:[{role:'user',content:[
+          {type:'image',source:{type:'base64',media_type:media,data:data}},
+          {type:'text',text:'この名刺画像から各項目を抽出してください。フリガナは氏名の読みを全角カタカナで。記載がない項目は空文字列にしてください。電話・メールが1つだけならtel/mailに入れ、tel2/mail2は空に。'}
+        ]}]
+      })
+    });
+    if(!res.ok){
+      const t=await res.text();
+      if(res.status===401) throw new Error('APIキーが正しくありません。設定を確認してください。');
+      if(res.status===429) throw new Error('利用制限に達しました。少し待って再試行してください。');
+      throw new Error('読み取りに失敗しました（'+res.status+'）\n'+t.slice(0,200));
+    }
+    const json=await res.json();
+    const textBlock=(json.content||[]).find(b=>b.type==='text');
+    if(!textBlock) throw new Error('結果を取得できませんでした。');
+    const out=JSON.parse(textBlock.text);
+    Object.keys(OCR_FIELDS).forEach(k=>{ if(out[k]) document.getElementById('f-'+k).value=out[k]; });
+    toast('読み取りました。内容を確認してください');
+  }catch(e){
+    alert('AI読み取りエラー：\n'+e.message);
+  }finally{
+    btn.disabled=false; btn.textContent=old;
+  }
+}
+
+/* ===== 起動 ===== */
+loadDB(); render();
+</script>
+</body>
+</html>
