@@ -408,6 +408,8 @@ function importPaste(){
   lines.forEach(orig=>{
     if(/iPhoneから送信|Sent from my/i.test(orig)) return; // メール署名を除外
     let ln=orig;
+    // OCRで番地や日本語にメールが繋がった場合に分離（例: 997-1r-sbt@ → 997-1 r-sbt@）
+    ln=ln.replace(/([0-9０-９]+[-－][0-9０-９]+|[一-龥々ぁ-んァ-ヶー])(?=[\w.+-]*[A-Za-z])([\w.+-]+@)/g,'$1 $2');
     // メール（1行に複数・他情報と同居でも抽出）
     const em=ln.match(emailRe); if(em){ em.forEach(e=>mails.push(e)); ln=ln.replace(emailRe,' '); }
     // 郵便番号
@@ -416,7 +418,7 @@ function importPaste(){
     const isFax=/fax|ＦＡＸ|ﾌｧｸｽ|ファクス/i.test(orig);
     const ph=ln.match(telRe); if(ph){ ph.forEach(p=>{ if(isFax) setIf('fax',p); else tels.push(p); }); ln=ln.replace(telRe,' '); }
     // ラベル語を除去
-    ln=ln.replace(/(携帯|電話|フリーダイヤル|TEL|Tel|FAX|Fax|E-?mail|Mail|URL|〒)[:：]?/gi,' ').replace(/\s+/g,' ').trim();
+    ln=ln.replace(/(携帯|携带|電話|フリーダイヤル|TEL|Tel|FAX|Fax|E-?mail|Mail|URL|〒)[:：]?/gi,' ').replace(/\s+/g,' ').trim();
     if(!ln) return;
     // 住所（都道府県・番地）
     if(PREF.test(ln) || /[0-9０-９]+(丁目|番地|番|号)/.test(ln) || /[市区町村郡].*[0-9０-９]/.test(ln)){ addAddr(ln); return; }
